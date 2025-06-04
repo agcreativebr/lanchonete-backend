@@ -13,7 +13,9 @@ async function startServer() {
     // Verificar se JWT_SECRET está configurado
     if (!process.env.JWT_SECRET) {
       console.error('❌ ERRO CRÍTICO: JWT_SECRET não configurado no arquivo .env');
-      console.error('Execute: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"');
+      console.error(
+        "Execute: node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\""
+      );
       console.error('E adicione o resultado no arquivo .env como JWT_SECRET=<resultado>');
       process.exit(1);
     }
@@ -27,7 +29,7 @@ async function startServer() {
     console.log('✅ JWT_REFRESH_SECRET configurado corretamente');
 
     await initializeModels();
-    
+
     app.listen(PORT, () => {
       console.log(`🚀 Servidor rodando na porta ${PORT}`);
       console.log(`📊 Health check: http://localhost:${PORT}/api/health`);

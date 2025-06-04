@@ -2,7 +2,7 @@ import { DataTypes, Model, Optional } from 'sequelize';
 import sequelize from '../config/database';
 import { OrderStatus, PaymentMethod } from '../types';
 
-interface OrderAttributes {
+export interface OrderAttributes {
   id: number;
   orderNumber: string;
   customerName: string;
@@ -18,10 +18,10 @@ interface OrderAttributes {
   updatedAt: Date;
 }
 
-interface OrderCreationAttributes
+export interface OrderCreationAttributes
   extends Optional<
     OrderAttributes,
-    'id' | 'orderNumber' | 'totalAmount' | 'estimatedTime' | 'createdAt' | 'updatedAt'
+    'id' | 'createdAt' | 'updatedAt' | 'orderNumber' | 'status' | 'totalAmount' | 'estimatedTime'
   > {}
 
 class Order extends Model<OrderAttributes, OrderCreationAttributes> implements OrderAttributes {
@@ -39,26 +39,12 @@ class Order extends Model<OrderAttributes, OrderCreationAttributes> implements O
   declare readonly createdAt: Date;
   declare readonly updatedAt: Date;
 
-  declare items?: any[];
-
-  public generateOrderNumber(): string {
+  private generateOrderNumber(): string {
     const timestamp = Date.now().toString().slice(-6);
-    const random = Math.floor(Math.random() * 100)
+    const random = Math.floor(Math.random() * 1000)
       .toString()
-      .padStart(2, '0');
-    return `ORD${timestamp}${random}`;
-  }
-
-  public calculateTotalAmount(items: Array<{ price: number; quantity: number }>): number {
-    return items.reduce((total, item) => total + item.price * item.quantity, 0);
-  }
-
-  public calculateEstimatedTime(
-    items: Array<{ preparationTime: number; quantity: number }>
-  ): number {
-    const maxPreparationTime = Math.max(...items.map((item) => item.preparationTime || 15));
-    const totalItems = items.reduce((total, item) => total + item.quantity, 0);
-    return maxPreparationTime + Math.ceil(totalItems / 3) * 5;
+      .padStart(3, '0');
+    return `PED${timestamp}${random}`;
   }
 }
 
@@ -86,7 +72,7 @@ Order.init(
       type: DataTypes.STRING(20),
       allowNull: true,
       validate: {
-        is: /^[\d\s\-\(\)\+]+$/,
+        is: /^$|^[\d\s\-\(\)\+]{10,20}$/,
       },
     },
     tableNumber: {
@@ -150,9 +136,12 @@ Order.init(
     underscored: true,
     timestamps: true,
     hooks: {
-      beforeCreate: (order: Order) => {
+      beforeValidate: (order: Order) => {
         if (!order.orderNumber) {
-          order.orderNumber = order.generateOrderNumber();
+          order.orderNumber = order['generateOrderNumber']();
+        }
+        if (order.customerPhone === '') {
+          order.customerPhone = undefined;
         }
       },
     },
@@ -160,4 +149,3 @@ Order.init(
 );
 
 export default Order;
-export type { OrderCreationAttributes };

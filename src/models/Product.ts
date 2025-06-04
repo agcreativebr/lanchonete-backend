@@ -7,54 +7,45 @@ interface ProductAttributes {
   description?: string;
   price: number;
   categoryId: number;
-  imageUrl?: string;
-  preparationTime: number;
+  preparationTime?: number;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
 
-interface ProductCreationAttributes
+export interface ProductCreationAttributes
   extends Optional<
     ProductAttributes,
-    'id' | 'preparationTime' | 'isActive' | 'createdAt' | 'updatedAt'
+    'id' | 'description' | 'preparationTime' | 'isActive' | 'createdAt' | 'updatedAt'
   > {}
 
 class Product
   extends Model<ProductAttributes, ProductCreationAttributes>
   implements ProductAttributes
 {
-  // ✅ USAR 'declare' em vez de 'public'
   declare id: number;
   declare name: string;
   declare description?: string;
   declare price: number;
   declare categoryId: number;
-  declare imageUrl?: string;
-  declare preparationTime: number;
+  declare preparationTime?: number;
   declare isActive: boolean;
   declare readonly createdAt: Date;
   declare readonly updatedAt: Date;
-
-  public getFormattedPrice(): string {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(this.price);
-  }
 }
 
 Product.init(
   {
     id: {
       type: DataTypes.INTEGER,
-      primaryKey: true,
       autoIncrement: true,
+      primaryKey: true,
     },
     name: {
-      type: DataTypes.STRING(255),
+      type: DataTypes.STRING(100),
       allowNull: false,
       validate: {
+        len: [2, 100],
         notEmpty: true,
       },
     },
@@ -66,25 +57,24 @@ Product.init(
       type: DataTypes.DECIMAL(10, 2),
       allowNull: false,
       validate: {
-        min: 0.01,
-      },
-      get() {
-        const value = this.getDataValue('price');
-        return value ? parseFloat(value.toString()) : 0;
+        min: 0,
       },
     },
     categoryId: {
       type: DataTypes.INTEGER,
       allowNull: false,
-    },
-    imageUrl: {
-      type: DataTypes.STRING(500),
-      allowNull: true,
+      references: {
+        model: 'categories',
+        key: 'id',
+      },
     },
     preparationTime: {
       type: DataTypes.INTEGER,
-      allowNull: false,
-      defaultValue: 15,
+      allowNull: true,
+      validate: {
+        min: 1,
+        max: 180,
+      },
     },
     isActive: {
       type: DataTypes.BOOLEAN,
@@ -102,10 +92,11 @@ Product.init(
   },
   {
     sequelize,
+    modelName: 'Product',
     tableName: 'products',
+    underscored: true,
     timestamps: true,
   }
 );
 
 export default Product;
-export type { ProductCreationAttributes };

@@ -1,20 +1,21 @@
 import { DataTypes, Model, Optional } from 'sequelize';
 import sequelize from '../config/database';
 
-interface OrderItemAttributes {
+export interface OrderItemAttributes {
   id: number;
   orderId: number;
   productId: number;
   quantity: number;
   unitPrice: number;
-  totalPrice: number;
+  totalPrice: number; // ✅ CAMPO ADICIONADO
   notes?: string;
   createdAt: Date;
   updatedAt: Date;
 }
 
-interface OrderItemCreationAttributes
-  extends Optional<OrderItemAttributes, 'id' | 'totalPrice' | 'createdAt' | 'updatedAt'> {}
+// ✅ totalPrice é obrigatório na criação, pois é calculado
+export interface OrderItemCreationAttributes
+  extends Optional<OrderItemAttributes, 'id' | 'createdAt' | 'updatedAt'> {}
 
 class OrderItem
   extends Model<OrderItemAttributes, OrderItemCreationAttributes>
@@ -25,14 +26,10 @@ class OrderItem
   declare productId: number;
   declare quantity: number;
   declare unitPrice: number;
-  declare totalPrice: number;
+  declare totalPrice: number; // ✅ CAMPO ADICIONADO
   declare notes?: string;
   declare readonly createdAt: Date;
   declare readonly updatedAt: Date;
-
-  public calculateTotalPrice(): number {
-    return this.unitPrice * this.quantity;
-  }
 }
 
 OrderItem.init(
@@ -46,16 +43,15 @@ OrderItem.init(
       type: DataTypes.INTEGER,
       allowNull: false,
       references: {
-        model: 'orders',
+        model: 'orders', // Nome da tabela 'orders'
         key: 'id',
       },
-      onDelete: 'CASCADE',
     },
     productId: {
       type: DataTypes.INTEGER,
       allowNull: false,
       references: {
-        model: 'products',
+        model: 'products', // Nome da tabela 'products'
         key: 'id',
       },
     },
@@ -64,7 +60,6 @@ OrderItem.init(
       allowNull: false,
       validate: {
         min: 1,
-        max: 50,
       },
     },
     unitPrice: {
@@ -75,6 +70,7 @@ OrderItem.init(
       },
     },
     totalPrice: {
+      // ✅ DEFINIÇÃO DO CAMPO
       type: DataTypes.DECIMAL(10, 2),
       allowNull: false,
       validate: {
@@ -97,16 +93,10 @@ OrderItem.init(
   {
     sequelize,
     modelName: 'OrderItem',
-    tableName: 'order_items',
+    tableName: 'order_items', // Nome da tabela consistentemente em minúsculas e plural
     underscored: true,
     timestamps: true,
-    hooks: {
-      beforeSave: (orderItem: OrderItem) => {
-        orderItem.totalPrice = orderItem.calculateTotalPrice();
-      },
-    },
   }
 );
 
 export default OrderItem;
-export type { OrderItemCreationAttributes };

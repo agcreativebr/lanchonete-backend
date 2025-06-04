@@ -25,7 +25,7 @@ export class AuthMiddleware {
   static async authenticate(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const authHeader = req.headers.authorization;
-      
+
       if (!authHeader) {
         res.status(401).json({ success: false, error: 'Token de acesso requerido' });
         return;
@@ -33,14 +33,16 @@ export class AuthMiddleware {
 
       const parts = authHeader.split(' ');
       if (parts.length !== 2 || parts[0] !== 'Bearer') {
-        res.status(401).json({ success: false, error: 'Formato de token inválido. Use: Bearer <token>' });
+        res
+          .status(401)
+          .json({ success: false, error: 'Formato de token inválido. Use: Bearer <token>' });
         return;
       }
 
       const token = parts[1];
-      
-      // ✅ SOLUÇÃO BASEADA NO STACK OVERFLOW: Verificar se JWT_SECRET existe
-      if (!process.env.JWT_SECRET) {
+
+      const jwtSecret = process.env.JWT_SECRET;
+      if (!jwtSecret) {
         console.error('JWT_SECRET não configurado');
         res.status(500).json({ success: false, error: 'Configuração de JWT não encontrada' });
         return;
@@ -48,14 +50,13 @@ export class AuthMiddleware {
 
       let decoded: JwtPayload;
       try {
-        // ✅ SOLUÇÃO BASEADA NO REDDIT: Non-null assertion operator (!)
-        decoded = jwt.verify(token, process.env.JWT_SECRET!) as JwtPayload;
+        decoded = jwt.verify(token, jwtSecret) as JwtPayload;
       } catch (jwtError) {
         console.error('Erro JWT:', jwtError);
         res.status(401).json({ success: false, error: 'Token inválido' });
         return;
       }
-      
+
       const user = await User.findByPk(decoded.userId);
       if (!user) {
         res.status(401).json({ success: false, error: 'Usuário não encontrado' });
@@ -89,9 +90,9 @@ export class AuthMiddleware {
       }
 
       if (!roles.includes(req.user.role)) {
-        res.status(403).json({ 
-          success: false, 
-          error: `Acesso negado. Roles permitidos: ${roles.join(', ')}` 
+        res.status(403).json({
+          success: false,
+          error: `Acesso negado. Roles permitidos: ${roles.join(', ')}`,
         });
         return;
       }
@@ -108,9 +109,9 @@ export class AuthMiddleware {
 
     const managerRoles: UserRole[] = [UserRole.ADMIN, UserRole.MANAGER];
     if (!managerRoles.includes(req.user.role)) {
-      res.status(403).json({ 
-        success: false, 
-        error: 'Acesso restrito a gerentes ou administradores' 
+      res.status(403).json({
+        success: false,
+        error: 'Acesso restrito a gerentes ou administradores',
       });
       return;
     }
@@ -125,9 +126,9 @@ export class AuthMiddleware {
     }
 
     if (req.user.role !== UserRole.ADMIN) {
-      res.status(403).json({ 
-        success: false, 
-        error: 'Acesso restrito a administradores' 
+      res.status(403).json({
+        success: false,
+        error: 'Acesso restrito a administradores',
       });
       return;
     }

@@ -24,9 +24,12 @@ export class UserService {
     }
   }
 
-  static async authenticateUser(email: string, password: string): Promise<{ user: SafeUser; token: string; refreshToken: string }> {
+  static async authenticateUser(
+    email: string,
+    password: string
+  ): Promise<{ user: SafeUser; token: string; refreshToken: string }> {
     const user = await User.findOne({ where: { email } });
-    
+
     if (!user || !user.isActive) {
       throw new Error('Credenciais inválidas');
     }
@@ -36,14 +39,12 @@ export class UserService {
       throw new Error('Credenciais inválidas');
     }
 
-    // ✅ SOLUÇÃO STACK OVERFLOW (Resultado 3): Verificar se JWT_SECRET existe
-    const jwtSecret = process.env.JWT_SECRET;
-    if (!jwtSecret) {
+    // ✅ SOLUÇÃO STACK OVERFLOW [3]: Verificação prévia obrigatória
+    if (!process.env.JWT_SECRET) {
       throw new Error('JWT_SECRET não configurado no ambiente');
     }
 
-    const jwtRefreshSecret = process.env.JWT_REFRESH_SECRET;
-    if (!jwtRefreshSecret) {
+    if (!process.env.JWT_REFRESH_SECRET) {
       throw new Error('JWT_REFRESH_SECRET não configurado no ambiente');
     }
 
@@ -53,17 +54,14 @@ export class UserService {
       role: user.role,
     };
 
-    // ✅ SOLUÇÃO FREECODECAMP (Resultado 6): Usar variável verificada
-    const token = jwt.sign(tokenPayload, jwtSecret, {
+    // ✅ SOLUÇÃO REDDIT [4]: Non-null assertion após verificação
+    const token = jwt.sign(tokenPayload, process.env.JWT_SECRET!, {
       expiresIn: process.env.JWT_EXPIRES_IN || '24h',
-    });
+    } as jwt.SignOptions);
 
-    // ✅ SOLUÇÃO FREECODECAMP (Resultado 6): Usar variável verificada
-    const refreshToken = jwt.sign(
-      { userId: user.id },
-      jwtRefreshSecret,
-      { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d' }
-    );
+    const refreshToken = jwt.sign({ userId: user.id }, process.env.JWT_REFRESH_SECRET!, {
+      expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
+    } as jwt.SignOptions);
 
     return {
       user: user.toSafeObject(),
@@ -72,25 +70,27 @@ export class UserService {
     };
   }
 
-  static async refreshToken(refreshToken: string): Promise<{ token: string; refreshToken: string }> {
-    // ✅ SOLUÇÃO STACK OVERFLOW (Resultado 3): Verificar se existe
-    const jwtRefreshSecret = process.env.JWT_REFRESH_SECRET;
-    if (!jwtRefreshSecret) {
+  static async refreshToken(
+    refreshToken: string
+  ): Promise<{ token: string; refreshToken: string }> {
+    // ✅ SOLUÇÃO STACK OVERFLOW [3]: Verificação prévia obrigatória
+    if (!process.env.JWT_REFRESH_SECRET) {
       throw new Error('JWT_REFRESH_SECRET não configurado');
     }
 
     try {
-      // ✅ SOLUÇÃO FREECODECAMP (Resultado 6): Usar variável verificada
-      const decoded = jwt.verify(refreshToken, jwtRefreshSecret) as { userId: number };
-      
+      // ✅ SOLUÇÃO REDDIT [4]: Non-null assertion após verificação
+      const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET!) as {
+        userId: number;
+      };
+
       const user = await User.findByPk(decoded.userId);
       if (!user || !user.isActive) {
         throw new Error('Usuário não encontrado ou inativo');
       }
 
-      // ✅ SOLUÇÃO STACK OVERFLOW (Resultado 3): Verificar se existe
-      const jwtSecret = process.env.JWT_SECRET;
-      if (!jwtSecret) {
+      // ✅ SOLUÇÃO STACK OVERFLOW [3]: Verificação prévia obrigatória
+      if (!process.env.JWT_SECRET) {
         throw new Error('JWT_SECRET não configurado');
       }
 
@@ -100,17 +100,14 @@ export class UserService {
         role: user.role,
       };
 
-      // ✅ SOLUÇÃO FREECODECAMP (Resultado 6): Usar variável verificada
-      const newToken = jwt.sign(tokenPayload, jwtSecret, {
+      // ✅ SOLUÇÃO REDDIT [4]: Non-null assertion após verificação
+      const newToken = jwt.sign(tokenPayload, process.env.JWT_SECRET!, {
         expiresIn: process.env.JWT_EXPIRES_IN || '24h',
-      });
+      } as jwt.SignOptions);
 
-      // ✅ SOLUÇÃO FREECODECAMP (Resultado 6): Usar variável verificada
-      const newRefreshToken = jwt.sign(
-        { userId: user.id },
-        jwtRefreshSecret,
-        { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d' }
-      );
+      const newRefreshToken = jwt.sign({ userId: user.id }, process.env.JWT_REFRESH_SECRET!, {
+        expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
+      } as jwt.SignOptions);
 
       return {
         token: newToken,
@@ -126,8 +123,8 @@ export class UserService {
       where: { isActive: true },
       order: [['createdAt', 'DESC']],
     });
-    
-    return users.map(user => user.toSafeObject());
+
+    return users.map((user) => user.toSafeObject());
   }
 
   static async getUserById(id: number): Promise<SafeUser | null> {
@@ -137,7 +134,7 @@ export class UserService {
 
   static async updateUser(id: number, userData: Partial<CreateUserDTO>): Promise<SafeUser> {
     const user = await User.findByPk(id);
-    
+
     if (!user) {
       throw new Error('Usuário não encontrado');
     }
@@ -155,7 +152,7 @@ export class UserService {
 
   static async deleteUser(id: number): Promise<void> {
     const user = await User.findByPk(id);
-    
+
     if (!user) {
       throw new Error('Usuário não encontrado');
     }
