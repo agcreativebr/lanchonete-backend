@@ -1,67 +1,44 @@
 import { Request, Response, NextFunction } from 'express';
-import Joi from 'joi';
+import { Schema } from 'joi';
 
-export const validateBody = (schema: Joi.ObjectSchema) => {
+export const validateBody = (schema: Schema) => {
   return (req: Request, res: Response, next: NextFunction): void => {
-    const { error, value } = schema.validate(req.body, {
-      abortEarly: false, // Retorna todos os erros, não apenas o primeiro
-      stripUnknown: true, // Remove campos não definidos no schema
-    });
-
+    const { error } = schema.validate(req.body);
     if (error) {
-      const errorMessages = error.details.map((detail) => detail.message);
       res.status(400).json({
         success: false,
-        error: 'Dados de entrada inválidos',
-        details: errorMessages,
+        error: error.details[0].message,
       });
       return;
     }
-
-    // Substitui req.body pelos dados validados e limpos
-    req.body = value;
     next();
   };
 };
 
-export const validateParams = (schema: Joi.ObjectSchema) => {
+export const validateParams = (schema: Schema) => {
   return (req: Request, res: Response, next: NextFunction): void => {
-    const { error, value } = schema.validate(req.params, {
-      abortEarly: false,
-    });
-
+    const { error } = schema.validate(req.params);
     if (error) {
-      const errorMessages = error.details.map((detail) => detail.message);
       res.status(400).json({
         success: false,
-        error: 'Parâmetros inválidos',
-        details: errorMessages,
+        error: error.details[0].message,
       });
       return;
     }
-
-    req.params = value;
     next();
   };
 };
 
-export const validateQuery = (schema: Joi.ObjectSchema) => {
+export const validateQuery = (schema: Schema) => {
   return (req: Request, res: Response, next: NextFunction): void => {
-    const { error, value } = schema.validate(req.query, {
-      abortEarly: false,
-    });
-
+    const { error } = schema.validate(req.query);
     if (error) {
-      const errorMessages = error.details.map((detail) => detail.message);
       res.status(400).json({
         success: false,
-        error: 'Query parameters inválidos',
-        details: errorMessages,
+        error: error.details[0].message,
       });
       return;
     }
-
-    req.query = value;
     next();
   };
 };

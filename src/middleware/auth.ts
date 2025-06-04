@@ -1,109 +1,97 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { User } from '../models';
-import { SafeUser } from '../types';
+import { UserRole } from '../types';
 
-// Estender Request globalmente
+interface JwtPayload {
+  userId: number;
+  email: string;
+  role: UserRole;
+}
+
 declare global {
   namespace Express {
     interface Request {
-      user?: SafeUser;
+      user?: {
+        id: number;
+        email: string;
+        role: UserRole;
+      };
     }
   }
-}
-
-interface JWTPayload {
-  id: number;
-  email: string;
-  role: string;
-  iat: number;
-  exp: number;
 }
 
 export class AuthMiddleware {
-  private static getJWTSecret(): string {
-    const secret = process.env.JWT_SECRET;
-    if (!secret) {
-      throw new Error('JWT_SECRET não está configurado nas variáveis de ambiente');
-    }
-    return secret;
-  }
-
   static async authenticate(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const authHeader = req.headers.authorization;
-
+      
       if (!authHeader) {
-        res.status(401).json({
-          success: false,
-          error: 'Token de acesso requerido',
-        });
+        res.status(401).json({ success: false, error: 'Token de acesso requerido' });
         return;
       }
 
-      const token = authHeader.split(' ')[1];
-      if (!token) {
-        res.status(401).json({
-          success: false,
-          error: 'Formato de token inválido',
-        });
+      const parts = authHeader.split(' ');
+      if (parts.length !== 2 || parts[0] !== 'Bearer') {
+        res.status(401).json({ success: false, error: 'Formato de token inválido. Use: Bearer <token>' });
         return;
       }
 
-      const secret = AuthMiddleware.getJWTSecret();
-      const decoded = jwt.verify(token, secret) as JWTPayload;
-
-      const user = await User.findByPk(decoded.id);
-      if (!user || !user.isActive) {
-        res.status(401).json({
-          success: false,
-          error: 'Usuário não encontrado ou inativo',
-        });
+      const token = parts[1];
+      
+      // ✅ SOLUÇÃO BASEADA NO STACK OVERFLOW: Verificar se JWT_SECRET existe
+      if (!process.env.JWT_SECRET) {
+        console.error('JWT_SECRET não configurado');
+        res.status(500).json({ success: false, error: 'Configuração de JWT não encontrada' });
         return;
       }
 
-      req.user = user.toSafeObject();
+      let decoded: JwtPayload;
+      try {
+        // ✅ SOLUÇÃO BASEADA NO REDDIT: Non-null assertion operator (!)
+        decoded = jwt.verify(token, process.env.JWT_SECRET!) as JwtPayload;
+      } catch (jwtError) {
+        console.error('Erro JWT:', jwtError);
+        res.status(401).json({ success: false, error: 'Token inválido' });
+        return;
+      }
+      
+      const user = await User.findByPk(decoded.userId);
+      if (!user) {
+        res.status(401).json({ success: false, error: 'Usuário não encontrado' });
+        return;
+      }
+
+      if (!user.isActive) {
+        res.status(401).json({ success: false, error: 'Usuário inativo' });
+        return;
+      }
+
+      req.user = {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+      };
+
       next();
-    } catch (err) {
-      if (err instanceof Error) {
-        if (err.name === 'JsonWebTokenError') {
-          res.status(401).json({
-            success: false,
-            error: 'Token inválido',
-          });
-          return;
-        }
-
-        if (err.name === 'TokenExpiredError') {
-          res.status(401).json({
-            success: false,
-            error: 'Token expirado',
-          });
-          return;
-        }
-      }
-
-      res.status(500).json({
-        success: false,
-        error: 'Erro interno do servidor',
-      });
+    } catch (error) {
+      console.error('Erro no middleware de autenticação:', error);
+      res.status(500).json({ success: false, error: 'Erro interno do servidor' });
+      return;
     }
   }
 
-  static authorize(roles: string[]) {
+  static authorize(roles: UserRole[]) {
     return (req: Request, res: Response, next: NextFunction): void => {
       if (!req.user) {
-        res.status(401).json({
-          success: false,
-          error: 'Usuário não autenticado',
-        });
+        res.status(401).json({ success: false, error: 'Usuário não autenticado' });
         return;
       }
 
       if (!roles.includes(req.user.role)) {
-        res.status(403).json({
-          success: false,
-          error: 'Acesso negado. Permissão insuficiente',
+        res.status(403).json({ 
+          success: false, 
+          error: `Acesso negado. Roles permitidos: ${roles.join(', ')}` 
         });
         return;
       }
@@ -112,40 +100,38 @@ export class AuthMiddleware {
     };
   }
 
-  static requireAdmin(req: Request, res: Response, next: NextFunction): void {
-    AuthMiddleware.authorize(['admin'])(req, res, next);
-  }
-
   static requireManagerOrAbove(req: Request, res: Response, next: NextFunction): void {
-    AuthMiddleware.authorize(['admin', 'manager'])(req, res, next);
+    if (!req.user) {
+      res.status(401).json({ success: false, error: 'Usuário não autenticado' });
+      return;
+    }
+
+    const managerRoles: UserRole[] = [UserRole.ADMIN, UserRole.MANAGER];
+    if (!managerRoles.includes(req.user.role)) {
+      res.status(403).json({ 
+        success: false, 
+        error: 'Acesso restrito a gerentes ou administradores' 
+      });
+      return;
+    }
+
+    next();
   }
 
-  static async optionalAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const authHeader = req.headers.authorization;
-
-      if (!authHeader) {
-        next();
-        return;
-      }
-
-      const token = authHeader.split(' ')[1];
-      if (!token) {
-        next();
-        return;
-      }
-
-      const secret = AuthMiddleware.getJWTSecret();
-      const decoded = jwt.verify(token, secret) as JWTPayload;
-
-      const user = await User.findByPk(decoded.id);
-      if (user && user.isActive) {
-        req.user = user.toSafeObject();
-      }
-
-      next();
-    } catch {
-      next();
+  static requireAdmin(req: Request, res: Response, next: NextFunction): void {
+    if (!req.user) {
+      res.status(401).json({ success: false, error: 'Usuário não autenticado' });
+      return;
     }
+
+    if (req.user.role !== UserRole.ADMIN) {
+      res.status(403).json({ 
+        success: false, 
+        error: 'Acesso restrito a administradores' 
+      });
+      return;
+    }
+
+    next();
   }
 }

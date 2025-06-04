@@ -7,15 +7,15 @@
     "dev": "nodemon --exec ts-node src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "test": "cross-env NODE_ENV=test jest --coverage",
-    "test:watch": "cross-env NODE_ENV=test jest --watch",
+    "test": "cross-env NODE_ENV=test jest --setupFilesAfterEnv=./tests/setup.js --coverage --verbose",
+    "test:watch": "cross-env NODE_ENV=test jest --setupFilesAfterEnv=./tests/setup.js --watch",
     "type-check": "tsc --noEmit",
     "clean": "rimraf dist",
     "lint": "eslint src/**/*.ts tests/**/*.ts",
     "lint:check": "eslint src/**/*.ts tests/**/*.ts",
+    "lint:fix": "eslint src/**/*.ts tests/**/*.ts --fix",
     "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\"",
-    "format:all": "prettier --write .",
     "quality-check": "npm run clean && npm run type-check && npm run format && npm run lint:check && npm run test"
   },
   "keywords": [

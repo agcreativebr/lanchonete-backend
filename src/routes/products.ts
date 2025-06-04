@@ -2,7 +2,11 @@ import { Router } from 'express';
 import { ProductController } from '../controllers/ProductController';
 import { AuthMiddleware } from '../middleware/auth';
 import { validateBody, validateParams } from '../middleware/validation';
-import { createProductSchema, updateProductSchema } from '../validations/productValidation';
+import {
+  createProductSchema,
+  updateProductSchema,
+  categoryIdParamSchema,
+} from '../validations/productValidation';
 import { idParamSchema } from '../validations/commonValidation';
 
 const router = Router();
@@ -10,7 +14,11 @@ const router = Router();
 // Rotas públicas - listar produtos
 router.get('/', ProductController.getAll);
 router.get('/:id', validateParams(idParamSchema), ProductController.getById);
-router.get('/category/:categoryId', validateParams(idParamSchema), ProductController.getByCategory);
+router.get(
+  '/category/:categoryId',
+  validateParams(categoryIdParamSchema),
+  ProductController.getByCategory
+);
 
 // Rotas protegidas - gerenciar produtos (requer manager ou admin)
 router.post(

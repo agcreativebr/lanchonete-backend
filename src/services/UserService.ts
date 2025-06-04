@@ -1,33 +1,20 @@
-import User, { UserCreationAttributes } from '../models/User';
-import { SafeUser } from '../types';
+import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import { User } from '../models';
+import { CreateUserDTO, SafeUser, UserRole } from '../types';
 
 export class UserService {
-  private static getJWTSecret(): string {
-    const secret = process.env.JWT_SECRET;
-    if (!secret) {
-      throw new Error('JWT_SECRET não está configurado nas variáveis de ambiente');
-    }
-    return secret;
-  }
-
-  private static getJWTRefreshSecret(): string {
-    const secret = process.env.JWT_REFRESH_SECRET;
-    if (!secret) {
-      throw new Error('JWT_REFRESH_SECRET não está configurado nas variáveis de ambiente');
-    }
-    return secret;
-  }
-
-  static async createUser(userData: UserCreationAttributes): Promise<SafeUser> {
+  static async createUser(userData: CreateUserDTO): Promise<SafeUser> {
     try {
+      const existingUser = await User.findOne({ where: { email: userData.email } });
+      if (existingUser) {
+        throw new Error('Email já está em uso');
+      }
+
       const user = await User.create(userData);
       return user.toSafeObject();
     } catch (error) {
       if (error instanceof Error) {
-        if (error.name === 'SequelizeUniqueConstraintError') {
-          throw new Error('Email já está em uso');
-        }
         if (error.name === 'SequelizeValidationError') {
           const validationError = error as unknown as { errors: Array<{ message: string }> };
           throw new Error(validationError.errors.map((e) => e.message).join(', '));
@@ -37,18 +24,46 @@ export class UserService {
     }
   }
 
-  static async authenticateUser(
-    email: string,
-    password: string
-  ): Promise<{ user: SafeUser; token: string; refreshToken: string }> {
-    const user = await User.findOne({ where: { email, isActive: true } });
-
-    if (!user || !(await user.verifyPassword(password))) {
+  static async authenticateUser(email: string, password: string): Promise<{ user: SafeUser; token: string; refreshToken: string }> {
+    const user = await User.findOne({ where: { email } });
+    
+    if (!user || !user.isActive) {
       throw new Error('Credenciais inválidas');
     }
 
-    const token = UserService.generateAccessToken(user.toSafeObject());
-    const refreshToken = UserService.generateRefreshToken(user.toSafeObject());
+    const isPasswordValid = await user.verifyPassword(password);
+    if (!isPasswordValid) {
+      throw new Error('Credenciais inválidas');
+    }
+
+    // ✅ SOLUÇÃO STACK OVERFLOW (Resultado 3): Verificar se JWT_SECRET existe
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) {
+      throw new Error('JWT_SECRET não configurado no ambiente');
+    }
+
+    const jwtRefreshSecret = process.env.JWT_REFRESH_SECRET;
+    if (!jwtRefreshSecret) {
+      throw new Error('JWT_REFRESH_SECRET não configurado no ambiente');
+    }
+
+    const tokenPayload = {
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+    };
+
+    // ✅ SOLUÇÃO FREECODECAMP (Resultado 6): Usar variável verificada
+    const token = jwt.sign(tokenPayload, jwtSecret, {
+      expiresIn: process.env.JWT_EXPIRES_IN || '24h',
+    });
+
+    // ✅ SOLUÇÃO FREECODECAMP (Resultado 6): Usar variável verificada
+    const refreshToken = jwt.sign(
+      { userId: user.id },
+      jwtRefreshSecret,
+      { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d' }
+    );
 
     return {
       user: user.toSafeObject(),
@@ -57,51 +72,51 @@ export class UserService {
     };
   }
 
-  static generateAccessToken(user: SafeUser): string {
-    const payload = {
-      id: user.id,
-      email: user.email,
-      role: user.role,
-    };
+  static async refreshToken(refreshToken: string): Promise<{ token: string; refreshToken: string }> {
+    // ✅ SOLUÇÃO STACK OVERFLOW (Resultado 3): Verificar se existe
+    const jwtRefreshSecret = process.env.JWT_REFRESH_SECRET;
+    if (!jwtRefreshSecret) {
+      throw new Error('JWT_REFRESH_SECRET não configurado');
+    }
 
-    const secret = UserService.getJWTSecret();
-
-    return jwt.sign(payload, secret, { expiresIn: '24h' });
-  }
-
-  static generateRefreshToken(user: SafeUser): string {
-    const payload = {
-      id: user.id,
-      type: 'refresh',
-    };
-
-    const secret = UserService.getJWTRefreshSecret();
-
-    return jwt.sign(payload, secret, { expiresIn: '7d' });
-  }
-
-  static async refreshToken(
-    refreshToken: string
-  ): Promise<{ token: string; refreshToken: string }> {
     try {
-      const secret = UserService.getJWTRefreshSecret();
-      const decoded = jwt.verify(refreshToken, secret) as { id: number; type: string };
-
-      if (decoded.type !== 'refresh') {
-        throw new Error('Token inválido');
-      }
-
-      const user = await User.findByPk(decoded.id);
+      // ✅ SOLUÇÃO FREECODECAMP (Resultado 6): Usar variável verificada
+      const decoded = jwt.verify(refreshToken, jwtRefreshSecret) as { userId: number };
+      
+      const user = await User.findByPk(decoded.userId);
       if (!user || !user.isActive) {
-        throw new Error('Usuário não encontrado');
+        throw new Error('Usuário não encontrado ou inativo');
       }
 
-      const safeUser = user.toSafeObject();
-      return {
-        token: UserService.generateAccessToken(safeUser),
-        refreshToken: UserService.generateRefreshToken(safeUser),
+      // ✅ SOLUÇÃO STACK OVERFLOW (Resultado 3): Verificar se existe
+      const jwtSecret = process.env.JWT_SECRET;
+      if (!jwtSecret) {
+        throw new Error('JWT_SECRET não configurado');
+      }
+
+      const tokenPayload = {
+        userId: user.id,
+        email: user.email,
+        role: user.role,
       };
-    } catch {
+
+      // ✅ SOLUÇÃO FREECODECAMP (Resultado 6): Usar variável verificada
+      const newToken = jwt.sign(tokenPayload, jwtSecret, {
+        expiresIn: process.env.JWT_EXPIRES_IN || '24h',
+      });
+
+      // ✅ SOLUÇÃO FREECODECAMP (Resultado 6): Usar variável verificada
+      const newRefreshToken = jwt.sign(
+        { userId: user.id },
+        jwtRefreshSecret,
+        { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d' }
+      );
+
+      return {
+        token: newToken,
+        refreshToken: newRefreshToken,
+      };
+    } catch (error) {
       throw new Error('Refresh token inválido');
     }
   }
@@ -111,8 +126,8 @@ export class UserService {
       where: { isActive: true },
       order: [['createdAt', 'DESC']],
     });
-
-    return users.map((user) => user.toSafeObject());
+    
+    return users.map(user => user.toSafeObject());
   }
 
   static async getUserById(id: number): Promise<SafeUser | null> {
@@ -120,30 +135,31 @@ export class UserService {
     return user ? user.toSafeObject() : null;
   }
 
-  static async updateUser(
-    id: number,
-    updateData: Partial<UserCreationAttributes>
-  ): Promise<SafeUser> {
+  static async updateUser(id: number, userData: Partial<CreateUserDTO>): Promise<SafeUser> {
     const user = await User.findByPk(id);
-
+    
     if (!user) {
       throw new Error('Usuário não encontrado');
     }
 
-    await user.update(updateData);
+    if (userData.email && userData.email !== user.email) {
+      const existingUser = await User.findOne({ where: { email: userData.email } });
+      if (existingUser) {
+        throw new Error('Email já está em uso');
+      }
+    }
+
+    await user.update(userData);
     return user.toSafeObject();
   }
 
-  // ✅ MÉTODO DELETEUSER IMPLEMENTADO
   static async deleteUser(id: number): Promise<void> {
     const user = await User.findByPk(id);
-
+    
     if (!user) {
       throw new Error('Usuário não encontrado');
     }
 
-    // Soft delete - marca como inativo em vez de remover do banco
     await user.update({ isActive: false });
-    return;
   }
 }

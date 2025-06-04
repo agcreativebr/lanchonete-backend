@@ -11,7 +11,7 @@ describe('Products API Tests', () => {
     const sequelize = getSequelize();
     await sequelize.sync({ force: true });
 
-    // Criar usuário admin para testes (seguindo padrão da MEMORIA.md)
+    // Criar usuário admin para testes
     const adminUser = {
       name: 'Admin User',
       email: 'admin@teste.com',
@@ -19,15 +19,38 @@ describe('Products API Tests', () => {
       role: 'admin',
     };
 
-    await request(app).post('/api/users/register').send(adminUser);
+    const registerResponse = await request(app).post('/api/users/register').send(adminUser);
 
-    // Fazer login e obter token (seguindo padrão da MEMORIA.md)
+    console.log('Register Response:', registerResponse.status, registerResponse.body);
+
+    // Verificar se registro foi bem-sucedido
+    if (registerResponse.status !== 201) {
+      throw new Error(
+        `Falha no registro: ${registerResponse.status} - ${JSON.stringify(registerResponse.body)}`
+      );
+    }
+
+    // Fazer login e obter token
     const loginResponse = await request(app).post('/api/users/login').send({
       email: 'admin@teste.com',
       password: '123456',
     });
 
+    console.log('Login Response:', loginResponse.status, loginResponse.body);
+
+    // Verificar se login foi bem-sucedido
+    if (loginResponse.status !== 200) {
+      throw new Error(
+        `Falha no login: ${loginResponse.status} - ${JSON.stringify(loginResponse.body)}`
+      );
+    }
+
+    if (!loginResponse.body.data || !loginResponse.body.data.token) {
+      throw new Error(`Token não encontrado na resposta: ${JSON.stringify(loginResponse.body)}`);
+    }
+
     adminToken = loginResponse.body.data.token;
+    console.log('Admin Token obtido:', adminToken ? 'SIM' : 'NÃO');
 
     // Criar categoria para testes de produto
     const categoryResponse = await request(app)
@@ -38,7 +61,21 @@ describe('Products API Tests', () => {
         description: 'Categoria para testes de produto',
       });
 
+    console.log('Category Response:', categoryResponse.status, categoryResponse.body);
+
+    // Verificar se categoria foi criada com sucesso
+    if (categoryResponse.status !== 201) {
+      throw new Error(
+        `Falha na criação da categoria: ${categoryResponse.status} - ${JSON.stringify(categoryResponse.body)}`
+      );
+    }
+
+    if (!categoryResponse.body.data || !categoryResponse.body.data.id) {
+      throw new Error(`ID da categoria não encontrado: ${JSON.stringify(categoryResponse.body)}`);
+    }
+
     categoryId = categoryResponse.body.data.id;
+    console.log('Category ID obtido:', categoryId);
   });
 
   afterAll(async () => {
@@ -90,6 +127,7 @@ describe('Products API Tests', () => {
         .set('Authorization', `Bearer ${adminToken}`)
         .send(novoProduto);
 
+      expect(createResponse.status).toBe(201);
       const productId = createResponse.body.data.id;
 
       // Buscar por ID

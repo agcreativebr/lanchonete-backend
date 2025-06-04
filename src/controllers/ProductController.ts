@@ -52,7 +52,18 @@ export class ProductController {
   static async getByCategory(req: Request, res: Response): Promise<void> {
     try {
       const { categoryId } = req.params;
-      const products = await ProductService.getProductsByCategory(Number(categoryId));
+
+      const categoryIdNumber = Number(categoryId);
+
+      if (isNaN(categoryIdNumber) || categoryIdNumber <= 0) {
+        res.status(400).json({
+          success: false,
+          error: 'ID da categoria deve ser um número positivo',
+        });
+        return;
+      }
+
+      const products = await ProductService.getProductsByCategory(categoryIdNumber);
       res.json({ success: true, data: products });
       return;
     } catch (error) {

@@ -6,6 +6,22 @@ export enum UserRole {
   DELIVERY = 'delivery',
 }
 
+export enum OrderStatus {
+  PENDING = 'pending',
+  CONFIRMED = 'confirmed',
+  PREPARING = 'preparing',
+  READY = 'ready',
+  DELIVERING = 'delivering',
+  DELIVERED = 'delivered',
+  CANCELLED = 'cancelled',
+}
+
+export enum PaymentMethod {
+  CASH = 'cash',
+  CARD = 'card',
+  PIX = 'pix',
+}
+
 export interface CreateUserDTO {
   name: string;
   email: string;
@@ -26,6 +42,26 @@ export interface CreateProductDTO {
   preparationTime?: number;
 }
 
+export interface CreateOrderDTO {
+  customerName: string;
+  customerPhone?: string;
+  tableNumber?: number;
+  items: CreateOrderItemDTO[];
+  notes?: string;
+  paymentMethod: PaymentMethod;
+}
+
+export interface CreateOrderItemDTO {
+  productId: number;
+  quantity: number;
+  notes?: string;
+}
+
+export interface UpdateOrderStatusDTO {
+  status: OrderStatus;
+  notes?: string;
+}
+
 export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
@@ -39,6 +75,18 @@ export interface SafeUser {
   email: string;
   role: UserRole;
   isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface OrderSummary {
+  id: number;
+  orderNumber: string;
+  customerName: string;
+  status: OrderStatus;
+  totalAmount: number;
+  itemCount: number;
+  estimatedTime: number;
   createdAt: Date;
   updatedAt: Date;
 }

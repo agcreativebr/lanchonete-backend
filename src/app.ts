@@ -7,7 +7,8 @@ import morgan from 'morgan';
 // Importar rotas (seguindo padrão da MEMORIA.md)
 import userRoutes from './routes/users';
 import categoryRoutes from './routes/categories';
-import productRoutes from './routes/products'; // ✅ NOVA LINHA
+import productRoutes from './routes/products';
+import orderRoutes from './routes/orders'; // ✅ NOVA ROTA
 
 const app = express();
 
@@ -22,7 +23,8 @@ app.use(express.urlencoded({ extended: true }));
 // Rotas da API (seguindo padrão da MEMORIA.md)
 app.use('/api/users', userRoutes);
 app.use('/api/categories', categoryRoutes);
-app.use('/api/products', productRoutes); // ✅ NOVA LINHA
+app.use('/api/products', productRoutes);
+app.use('/api/orders', orderRoutes); // ✅ NOVA ROTA
 
 // Health check (seguindo padrão da MEMORIA.md)
 app.get('/api/health', (req, res) => {
@@ -34,7 +36,8 @@ app.get('/api/health', (req, res) => {
     endpoints: {
       users: '/api/users',
       categories: '/api/categories',
-      products: '/api/products', // ✅ NOVA LINHA
+      products: '/api/products',
+      orders: '/api/orders', // ✅ NOVO ENDPOINT
     },
   });
 });
